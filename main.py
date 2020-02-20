@@ -15,7 +15,7 @@ import time
 
 import argparse
 
-from data import prepareData, batchify
+from data import prepareData, batchify, FSIterator
 
 parser = argparse.ArgumentParser()
 
@@ -108,8 +108,10 @@ if __name__ == "__main__":
     batch_size = args.batch_size #TODO: batchsize and seq_len is the issue to be addressed
     n_epoches = args.max_epochs 
 
-    batches = batchify(np_data, batch_size, np_labels)
-    vbatches = batchify(np_vdata, batch_size, np_vlabels) 
+    #batches = batchify(np_data, batch_size, np_labels)
+    #vbatches = batchify(np_vdata, batch_size, np_vlabels) 
+    trainiter = FSIterator("./data/classification.tr")
+    validiter = FSIterator("./data/classification.val")
  
     device = torch.device("cuda")     
 
@@ -131,7 +133,7 @@ if __name__ == "__main__":
     all_losses = []
 
     start = time.time()
-    n_batches = len(batches)
+    #n_batches = len(batches)
 
     patience = 5    
     savePath = args.savePath
@@ -140,13 +142,11 @@ if __name__ == "__main__":
         bad_counter = 0
         best_loss = -1.0
 
-        for i in range(0, n_batches): #TODO for debugging
-            input, mask, target = getBatch(batches,i)
-
-            if input.size(0) - 1 == 0: # single-day data
+        for tr_x, tr_y, xm, end_of_file in trainiter:
+            if tr_x.size(0) - 1 == 0: # single-day data
                 continue
 
-            output, loss = train(rnn, input, mask, target, optimizer, criterion)
+            output, loss = train(rnn, tr_x, xm, tr_y, optimizer, criterion)
             current_loss += loss
 
             # print iter number, loss, prediction, and target
@@ -158,6 +158,9 @@ if __name__ == "__main__":
 
                 current_loss=0
 
+        print("-------validation-------")
+        sys.exit(0)
+        
         valid_loss = validate(rnn, vbatches)
         print("valid loss : {}".format(valid_loss))
         

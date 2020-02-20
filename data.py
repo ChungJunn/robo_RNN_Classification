@@ -13,6 +13,60 @@ import math
 import sys
 import time
 
+class FSIterator:
+    def __init__(self, filename, batch_size=4, just_epoch=False):
+        self.batch_size = batch_size
+        self.just_epoch = just_epoch
+        self.fp = open(filename, 'r')
+
+    def __iter__(self):
+        return self
+
+    def reset(self):
+        self.fp.seek(0)
+
+    def __next__(self):
+        bat_seq = []
+        bat_lbs = []
+
+        end_of_data = 0
+        for i in range(self.batch_size):
+            seq = self.fp.readline()
+            if seq == "":
+                if self.just_epoch:
+                    end_of_data = 1
+                    if self.batch_size==1:
+                        raise StopIteration
+                    else:
+                        break
+                self.reset()
+                seq = self.fp.readline()
+
+            seq_f = [float(s) for s in seq.split(',')]
+            seq_l = int(seq_f[-1])
+            seq_f = seq_f[:-1]
+
+            bat_seq.append(seq_f)
+            bat_lbs.append(seq_l)
+        
+        bat_seq = np.array(bat_seq)
+        bat_seq = trimBatch(bat_seq)
+        
+        import pdb; pdb.set_trace()
+        mask = getMask(bat_seq) # TimeSteps BatchSize
+
+        x_data = self.prepare_data(bat_seq)
+        y_data = np.array(bat_lbs).reshape(1,-1)
+
+        return x_data, y_data, mask, end_of_data
+
+    def prepare_data(self, seq):
+        seq = addPadding(seq) # zero padding
+        
+        x_data = addDelta(seq) # TimeSteps BatchSize InputDim 
+
+        return x_data #y_data
+
 def getSeq_len(row):
     '''
     returns: count of non-nans (integer)
@@ -24,7 +78,7 @@ def getMask(batch):
     '''
     returns: boolean array indicating whether nans
     '''
-    return (~np.isnan(batch)).astype(np.int32)
+    return (~np.isnan(batch)).astype(np.int32).transpose()
 
 def trimBatch(batch):
     '''
@@ -109,6 +163,9 @@ def prepareData():
     return np_data, np_labels, np_vdata, np_vlabels
 
 if __name__ == "__main__":
-    a, b, c, d = prepareData()
+    
+    
+    iterator = FSIterator("./data/classification_train.csv")
 
-    batches = batchify(a, 4, b)
+    for item in iterator:
+        print(item)

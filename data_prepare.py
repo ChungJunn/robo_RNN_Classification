@@ -74,12 +74,9 @@ if __name__ == "__main__":
     valid_data = np.hstack([valid_data, valid_labels])
     test_data = np.hstack([test_data, test_labels])
 
-    header = [str(i) for i in range(1,52)] + ["label"]
-    header = ','.join(header)
-
     with open(tr_out_file, "wt") as fp:
-        np.savetxt(fp, train_data, delimiter=',', header=header)
+        np.savetxt(fp, train_data, delimiter=',')
     with open(val_out_file, "wt") as fp:
-        np.savetxt(fp, valid_data, delimiter=',', header=header)
+        np.savetxt(fp, valid_data, delimiter=',')
     with open(test_out_file, "wt") as fp:
-        np.savetxt(fp, test_data, delimiter=',', header=header)
+        np.savetxt(fp, test_data, delimiter=',')
