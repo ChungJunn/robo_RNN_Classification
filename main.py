@@ -5,6 +5,7 @@ adopted from pytorch.org (Classifying names with a character-level RNN-Sean Robe
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.autograd import Variable
 
 import pandas as pd
 import numpy as np
@@ -31,18 +32,18 @@ def getBatch(source, i):
            torch.tensor(source[i][1]).type(torch.float32).to(device),\
            torch.tensor(source[i][2]).type(torch.LongTensor).to(device)
 
-def train(rnn, input, mask, target, optimizer, criterion):
+def train(model, input, mask, target, optimizer, criterion):
 
     loss_matrix = []
 
-    hidden = rnn.initHidden().to(device)
+    hidden = model.initHidden().to(device)
     
     optimizer.zero_grad()
     
     #input = input.unsqueeze(-1) # depricated after addDelta()
 
     for t in range(input.size(0) - 1):
-        output, hidden = rnn(input[t], hidden)
+        output, hidden = model(input[t], hidden)
         loss = criterion(output.view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
@@ -59,15 +60,15 @@ def train(rnn, input, mask, target, optimizer, criterion):
 
     return output, loss.item()
 
-def evaluate(rnn, input, mask, target, criterion):
+def evaluate(model, input, mask, target, criterion):
     loss_matrix = []
 
-    hidden = rnn.initHidden().to(device)
+    hidden = model.initHidden().to(device)
 
     #input = input.unsqueeze(-1) #deprecated after using addDelta()
     
     for t in range(input.size(0) - 1):
-        output, hidden = rnn(input[t], hidden)
+        output, hidden = model(input[t], hidden)
         loss = criterion(output.view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
@@ -80,17 +81,17 @@ def evaluate(rnn, input, mask, target, criterion):
 
     return output, loss.item()
 
-def validate(rnn, batches):
+def validate(model, batches):
     current_loss = 0
     n_batches = len(batches)
-    rnn.eval()
+    model.eval()
     with torch.no_grad(): 
         for i in range(0, n_batches):
             input, mask, target = getBatch(batches,i)
             
             if (input.size(0)-1)==0: continue
             
-            output, loss = evaluate(rnn, input, mask, target, criterion)
+            output, loss = evaluate(model, input, mask, target, criterion)
             current_loss += loss
     
     return current_loss / n_batches
@@ -110,23 +111,23 @@ if __name__ == "__main__":
 
     #batches = batchify(np_data, batch_size, np_labels)
     #vbatches = batchify(np_vdata, batch_size, np_vlabels) 
-    trainiter = FSIterator("./data/classification.tr")
-    validiter = FSIterator("./data/classification.val")
+    trainiter = FSIterator("./data/classification.tr", batch_size = batch_size)
+    validiter = FSIterator("./data/classification.val", batch_size = batch_size)
  
     device = torch.device("cuda")     
 
     # setup model
-    from model import RNN, NaiveRNN
+    from model import FS_MODEL1, FS_MODEL2
     input_size = 2
     hidden_size = args.hidden_size
     output_size = 2
     
-    rnn = RNN(input_size, hidden_size, output_size, batch_size).to(device)
-    #rnn = NaiveRNN(input_size, hidden_size, output_size, batch_size).to(device)
+    model = FS_MODEL2(input_size, hidden_size, output_size, batch_size).to(device)
+    #model = FS_MODEL1(input_size, hidden_size, output_size, batch_size).to(device)
 
     # define loss
     criterion = nn.NLLLoss(reduction='none')
-    optimizer = optim.RMSprop(rnn.parameters())
+    optimizer = optim.RMSprop(model.parameters())
     
     print_every = 100
     current_loss = 0
@@ -142,31 +143,35 @@ if __name__ == "__main__":
         bad_counter = 0
         best_loss = -1.0
 
-        for tr_x, tr_y, xm, end_of_file in trainiter:
+        for i, (tr_x, tr_y, xm, end_of_file) in enumerate(trainiter):
+            tr_x, tr_y, xm = torch.FloatTensor(tr_x), torch.LongTensor(tr_y), torch.FloatTensor(xm)
+            tr_x, tr_y, xm = Variable(tr_x).to(device), Variable(tr_y).to(device), Variable(xm).to(device)
+
             if tr_x.size(0) - 1 == 0: # single-day data
                 continue
 
-            output, loss = train(rnn, tr_x, xm, tr_y, optimizer, criterion)
+            output, loss = train(model, tr_x, xm, tr_y, optimizer, criterion)
             current_loss += loss
 
             # print iter number, loss, prediction, and target
             if (i+1) % print_every == 0:
                 top_n, top_i = output.topk(1)
                 #correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
-                print("%d %d%% (%s) %.4f" % (i+1, (i+1) / n_batches * 100, timeSince(start), current_loss/print_every))
+                print("%d (%s) %.4f" % (i+1,timeSince(start), current_loss/print_every))
                 all_losses.append(current_loss / print_every)
 
                 current_loss=0
-
-        print("-------validation-------")
-        sys.exit(0)
         
-        valid_loss = validate(rnn, vbatches)
+
+        #-------------------------------------------------#
+        sys.exit(0)
+        #TODO: implement usage of iterator for validation
+        valid_loss = validate(model, vbatches)
         print("valid loss : {}".format(valid_loss))
         
         if valid_loss < best_loss or best_loss < 0:
             bad_counter = 0
-            torch.save(rnn, savePath)
+            torch.save(model, savePath)
 
         else:
             bad_counter += 1

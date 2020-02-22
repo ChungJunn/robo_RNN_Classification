@@ -5,9 +5,9 @@ adopted from pytorch.org (Classifying names with a character-level RNN-Sean Robe
 import torch
 import torch.nn as nn
 
-class NaiveRNN(nn.Module):
+class FS_MODEL1(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, batch_size):
-        super(NaiveRNN, self).__init__()
+        super(FS_MODEL1, self).__init__()
 
         self.hidden_size = hidden_size
         self.batch_size = batch_size
@@ -26,9 +26,9 @@ class NaiveRNN(nn.Module):
     def initHidden(self):
         return torch.zeros(self.batch_size, self.hidden_size)
 
-class RNN(nn.Module):
+class FS_MODEL2(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, batch_size):
-        super(RNN, self).__init__()
+        super(FS_MODEL2, self).__init__()
 
         self.rnn = nn.LSTM(input_size, hidden_size, batch_first=False)
         self.fc = nn.Linear(hidden_size, output_size)

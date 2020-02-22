@@ -52,7 +52,6 @@ class FSIterator:
         bat_seq = np.array(bat_seq)
         bat_seq = trimBatch(bat_seq)
         
-        import pdb; pdb.set_trace()
         mask = getMask(bat_seq) # TimeSteps BatchSize
 
         x_data = self.prepare_data(bat_seq)
