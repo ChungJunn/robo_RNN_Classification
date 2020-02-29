@@ -16,23 +16,19 @@ import time
 
 import argparse
 
-from data import prepareData, batchify, FSIterator
+from data import FSIterator
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--batch_size', type=int, default=8, help='')
+parser.add_argument('--batch_size', type=int, default=32, help='')
 parser.add_argument('--hidden_size', type=int, default=8, help='')
 parser.add_argument('--savePath', type=str, required=True, help='')
 parser.add_argument('--max_epochs', type=int, default=1, help='')
 
 args = parser.parse_args()
 
-def getBatch(source, i):
-    return torch.tensor(source[i][0]).type(torch.float32).to(device),\
-           torch.tensor(source[i][1]).type(torch.float32).to(device),\
-           torch.tensor(source[i][2]).type(torch.LongTensor).to(device)
-
 def train(model, input, mask, target, optimizer, criterion):
+    model.train()
 
     loss_matrix = []
 
@@ -60,16 +56,14 @@ def train(model, input, mask, target, optimizer, criterion):
 
     return output, loss.item()
 
-def evaluate(model, input, mask, target, criterion):
+def evaluate(model, input, target, mask, criterion):
     loss_matrix = []
 
-    hidden = model.initHidden().to(device)
-
-    #input = input.unsqueeze(-1) #deprecated after using addDelta()
+    hidden = torch.zeros(2,1,input.size(1), model.hidden_size).to(device)
     
     for t in range(input.size(0) - 1):
         output, hidden = model(input[t], hidden)
-        loss = criterion(output.view(args.batch_size,-1), target.view(-1))
+        loss = criterion(output.view(input.size(1),-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
     loss_matrix = torch.cat(loss_matrix, dim=0)
@@ -81,20 +75,24 @@ def evaluate(model, input, mask, target, criterion):
 
     return output, loss.item()
 
-def validate(model, batches):
+def validate(model, validiter):
     current_loss = 0
-    n_batches = len(batches)
     model.eval()
     with torch.no_grad(): 
-        for i in range(0, n_batches):
-            input, mask, target = getBatch(batches,i)
+        for i, (tr_x, tr_y, xm, end_of_file) in enumerate(validiter): 
+            tr_x, tr_y, xm = torch.FloatTensor(tr_x), torch.LongTensor(tr_y), torch.FloatTensor(xm)
+            tr_x, tr_y, xm = Variable(tr_x).to(device), Variable(tr_y).to(device), Variable(xm).to(device)
             
-            if (input.size(0)-1)==0: continue
+            if (tr_x.size(0)-1)==0: continue
             
-            output, loss = evaluate(model, input, mask, target, criterion)
+            output, loss = evaluate(model, tr_x, tr_y, xm, criterion)
             current_loss += loss
+            
+           
+            if end_of_file == 1:
+                break
     
-    return current_loss / n_batches
+    return current_loss / (tr_x.size(0) * i)
 
 def timeSince(since):
     now = time.time()
@@ -104,18 +102,15 @@ def timeSince(since):
     return '%dm %ds' % (m, s)
 
 if __name__ == "__main__":
-    # prepare data
-    np_data, np_labels, np_vdata, np_vlabels = prepareData()
     batch_size = args.batch_size #TODO: batchsize and seq_len is the issue to be addressed
     n_epoches = args.max_epochs 
 
-    #batches = batchify(np_data, batch_size, np_labels)
-    #vbatches = batchify(np_vdata, batch_size, np_vlabels) 
     trainiter = FSIterator("./data/classification.tr", batch_size = batch_size)
-    validiter = FSIterator("./data/classification.val", batch_size = batch_size)
+    validiter = FSIterator("./data/classification.val", batch_size = batch_size, just_epoch=True) # batchd_size 1 is recommended, since remainder is discard
  
     device = torch.device("cuda")     
 
+    #TODO variables need to be args
     # setup model
     from model import FS_MODEL1, FS_MODEL2
     input_size = 2
@@ -130,18 +125,20 @@ if __name__ == "__main__":
     optimizer = optim.RMSprop(model.parameters())
     
     print_every = 100
-    current_loss = 0
-    all_losses = []
+    valid_every = 200
 
     start = time.time()
-    #n_batches = len(batches)
 
     patience = 5    
     savePath = args.savePath
-    
-    for ei in range(args.max_epochs):
+   
+ 
+    def train_main(model, trainiter, validiter, optimizer, device, print_every, valid_every):
+        all_losses=[]
+        current_loss =0
+        valid_loss = 0.0
         bad_counter = 0
-        best_loss = -1.0
+        best_loss = -1
 
         for i, (tr_x, tr_y, xm, end_of_file) in enumerate(trainiter):
             tr_x, tr_y, xm = torch.FloatTensor(tr_x), torch.LongTensor(tr_y), torch.FloatTensor(xm)
@@ -162,24 +159,23 @@ if __name__ == "__main__":
 
                 current_loss=0
         
-
-        #-------------------------------------------------#
-        sys.exit(0)
-        #TODO: implement usage of iterator for validation
-        valid_loss = validate(model, vbatches)
-        print("valid loss : {}".format(valid_loss))
+            if (i+1) % valid_every == 0:  
+                valid_loss = validate(model, validiter)
+                print("valid loss : {}".format(valid_loss))
         
-        if valid_loss < best_loss or best_loss < 0:
-            bad_counter = 0
-            torch.save(model, savePath)
+            if valid_loss < best_loss or best_loss < 0:
+                bad_counter = 0
+                torch.save(model, savePath)
 
-        else:
-            bad_counter += 1
+            else:
+                bad_counter += 1
 
-        if bad_counter > patience:
-            print('Early Stopping')
-            break
-         
+            if bad_counter > patience:
+                print('Early Stopping')
+                break
+    
+    train_main(model, trainiter, validiter, optimizer, device, print_every, valid_every)
+     
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt

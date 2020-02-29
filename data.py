@@ -38,6 +38,7 @@ class FSIterator:
                     if self.batch_size==1:
                         raise StopIteration
                     else:
+                        self.reset()
                         break
                 self.reset()
                 seq = self.fp.readline()

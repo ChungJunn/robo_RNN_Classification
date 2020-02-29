@@ -3,6 +3,14 @@ import numpy as np
 
 from data import addPadding
 
+a = None
+
+if a == None:
+    a = 10.
+
+print(a)
+
+'''
 def addPadding1D(data):
     for i in range(data.shape[0]):
         if np.isnan(data[i]): data[i] = 0
@@ -41,7 +49,7 @@ def addDelta(batch):
 batch_out = addDelta(batch_in)
 
 import pdb; pdb.set_trace()
-
+'''
 
 ### add row by row ###
 '''
