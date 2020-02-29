@@ -1,14 +1,37 @@
 import pandas as pd
 import numpy as np
+import torch.nn as nn
+import torch
 
 from data import addPadding
 
-a = None
+criterion = nn.NLLLoss(reduction='none')
 
-if a == None:
-    a = 10.
+def getDummy():
+    return torch.rand((1,5)), torch.randint(5,(1,)).type(torch.LongTensor)
 
-print(a)
+def getDummy2():
+    dummy, label = getDummy()
+    for i in range(2):
+        dummy_ , label_ = getDummy()
+        dummy, label = torch.cat([dummy, dummy_]), torch.cat([label, label_])
+    
+    return dummy.unsqueeze(0), label.unsqueeze(0)
+
+def getDummy3():
+    dummy, label = getDummy2()
+    for i in range(3):
+        dummy_, label_ = getDummy2()
+        dummy, label = torch.cat([dummy, dummy_]), torch.cat([label, label_])
+    
+    return dummy, label
+
+dummy, label = getDummy3()
+
+for i in range(dummy.size(0)):
+    loss = criterion(dummy[i], label[i])
+    import pdb; pdb.set_trace()
+
 
 '''
 def addPadding1D(data):

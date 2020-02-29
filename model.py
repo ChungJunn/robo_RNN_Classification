@@ -23,9 +23,6 @@ class FS_MODEL1(nn.Module):
         output = self.softmax(output)
         return output, hidden
 
-    def initHidden(self):
-        return torch.zeros(self.batch_size, self.hidden_size)
-
 class FS_MODEL2(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, batch_size):
         super(FS_MODEL2, self).__init__()
@@ -38,14 +35,9 @@ class FS_MODEL2(nn.Module):
         self.hidden_size = hidden_size
 
     def forward(self, input, hidden):
-        #import pdb; pdb.set_trace()
-        input = input.unsqueeze(0)
         
         output, hidden = self.rnn(input, hidden)        
         output = self.fc(output)
         output = self.softmax(output)
 
         return output, hidden
-
-    def initHidden(self):
-        return torch.zeros(2, 1, self.batch_size, self.hidden_size)

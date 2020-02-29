@@ -31,16 +31,14 @@ def train(model, input, mask, target, optimizer, criterion):
     model.train()
 
     loss_matrix = []
-
-    hidden = model.initHidden().to(device)
     
     optimizer.zero_grad()
-    
-    #input = input.unsqueeze(-1) # depricated after addDelta()
 
+    output, hidden = model(input, None)
+    
     for t in range(input.size(0) - 1):
-        output, hidden = model(input[t], hidden)
-        loss = criterion(output.view(args.batch_size,-1), target.view(-1))
+        #import pdb; pdb.set_trace()
+        loss = criterion(output[t], target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
     loss_matrix = torch.cat(loss_matrix, dim=0)
@@ -58,12 +56,11 @@ def train(model, input, mask, target, optimizer, criterion):
 
 def evaluate(model, input, target, mask, criterion):
     loss_matrix = []
-
-    hidden = torch.zeros(2,1,input.size(1), model.hidden_size).to(device)
+    
+    output, hidden = model(input, None)
     
     for t in range(input.size(0) - 1):
-        output, hidden = model(input[t], hidden)
-        loss = criterion(output.view(input.size(1),-1), target.view(-1))
+        loss = criterion(output[t], target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
     loss_matrix = torch.cat(loss_matrix, dim=0)
