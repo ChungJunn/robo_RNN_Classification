@@ -4,7 +4,7 @@ import torch.nn as nn
 import pandas as pd
 import argparse
 
-from model import RNN
+from model import FS_MODEL1, FS_MODEL2
 
 parser = argparse.ArgumentParser()
 
@@ -46,20 +46,20 @@ def getSample(np_data, np_labels, i):
 loadPath = args.loadPath
 batch_size = 1 # this is fixed to 1 at testing
 
-#rnn = RNN(input_size, hidden_size, output_size, batch_size)
+#model = RNN(input_size, hidden_size, output_size, batch_size)
 device = torch.device("cpu")
 
-rnn = torch.load(loadPath).to(device)
+model = torch.load(loadPath).to(device)
 
-if (str(rnn).split('('))[0] == 'NaiveRNN':
-    hidden_size = rnn.state_dict()['i2h.weight'].shape[0]
+if (str(model).split('('))[0] == 'FS_MODEL1':
+    hidden_size = model.state_dict()['i2h.weight'].shape[0]
     hidden = torch.zeros(1,hidden_size)
 else:
-    hidden_size = rnn.state_dict()['rnn.weight_hh_l0'].shape[1]
+    hidden_size = model.state_dict()['rnn.weight_hh_l0'].shape[1]
     hidden = torch.zeros((2,1,1,hidden_size))
 
 
-df = pd.read_csv("./data/classification_test.csv")
+df = pd.read_csv("./data/classification.test")
 np_test = np.asarray(df)
 
 np_data = np_test[:,:-1]
@@ -76,11 +76,10 @@ for n in range(np_data.shape[0]):
     print(n)
     
     input, label = getSample(np_data, np_labels, n)
-    #input = input.unsqueeze(-1)
-
+    import pdb; pdb.set_trace()
     for t in range(input.size(0) - 1):
 
-        output, hidden = rnn(input[t], hidden)
+        output, hidden = model(input[t], hidden)
     
         logit, pred = output.topk(1)
        
